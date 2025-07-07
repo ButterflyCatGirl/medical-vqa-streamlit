@@ -2,3 +2,5 @@ torch
 transformers
 streamlit
 pillow
+accelerate>=0.20.3
+bitsandbytes
