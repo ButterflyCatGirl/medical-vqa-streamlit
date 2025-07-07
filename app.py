@@ -10,8 +10,6 @@ st.set_page_config(page_title="Bilingual Medical VQA", layout="wide")
 def load_models():
     llava_model = AutoModelForImageTextToText.from_pretrained(
         "Mohamed264/llava-medical-VQA-lora-merged3",
-        device_map="auto",
-        load_in_8bit=True
     )
     processor = AutoProcessor.from_pretrained(
         "Mohamed264/llava-medical-VQA-lora-merged3"
