@@ -9,7 +9,7 @@ This repository contains a Streamlit application that uses a fine-tuned LLaVA-ba
 
 ## Files
 - `app.py` - Streamlit application code.
-- `requirements.txt` - List of Python dependencies.
+- `requirements.txt` - List of Python dependencies (including accelerate & bitsandbytes).
 
 ## Setup & Deployment
 1. Clone this repository:
