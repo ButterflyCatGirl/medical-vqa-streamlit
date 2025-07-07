@@ -1,6 +1,4 @@
-torch
-transformers
+torch==2.1.2
+transformers==4.38.2
 streamlit
 pillow
-accelerate>=0.20.3
-bitsandbytes
