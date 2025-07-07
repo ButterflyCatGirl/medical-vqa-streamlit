@@ -1,4 +1,3 @@
-# app.py
 import streamlit as st
 from transformers import AutoProcessor, AutoModelForImageTextToText, MarianMTModel, MarianTokenizer
 from PIL import Image
@@ -9,8 +8,14 @@ st.set_page_config(page_title="Bilingual Medical VQA", layout="wide")
 # Load models
 @st.cache_resource
 def load_models():
-    llava_model = AutoModelForImageTextToText.from_pretrained("Mohamed264/llava-medical-VQA-lora-merged3")
-    processor = AutoProcessor.from_pretrained("Mohamed264/llava-medical-VQA-lora-merged3")
+    llava_model = AutoModelForImageTextToText.from_pretrained(
+        "Mohamed264/llava-medical-VQA-lora-merged3",
+        device_map="auto",
+        load_in_8bit=True
+    )
+    processor = AutoProcessor.from_pretrained(
+        "Mohamed264/llava-medical-VQA-lora-merged3"
+    )
 
     ar_en_tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
     ar_en_model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
@@ -18,8 +23,16 @@ def load_models():
     en_ar_tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
     en_ar_model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
 
-    return llava_model, processor, ar_en_tokenizer, ar_en_model, en_ar_tokenizer, en_ar_model
+    return (
+        llava_model,
+        processor,
+        ar_en_tokenizer,
+        ar_en_model,
+        en_ar_tokenizer,
+        en_ar_model,
+    )
 
+# Instantiate models
 llava_model, processor, ar_en_tokenizer, ar_en_model, en_ar_tokenizer, en_ar_model = load_models()
 
 # Translation helpers
@@ -27,6 +40,7 @@ def translate_ar_to_en(text):
     inputs = ar_en_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
     outputs = ar_en_model.generate(**inputs)
     return ar_en_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+
 
 def translate_en_to_ar(text):
     inputs = en_ar_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
@@ -80,7 +94,9 @@ user_question = st.text_input("💬 أدخل سؤالك (بالعربية أو �
 if st.button("🔎 تحليل الصورة والإجابة"):
     if uploaded_image and user_question:
         image = Image.open(uploaded_image).convert("RGB")
-        question_ar, question_en, answer_ar, answer_en = vqa_multilingual(image, user_question)
+        question_ar, question_en, answer_ar, answer_en = vqa_multilingual(
+            image, user_question
+        )
 
         st.subheader("📌 السؤال بالعربية")
         st.success(question_ar)
