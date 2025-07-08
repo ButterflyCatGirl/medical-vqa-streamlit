@@ -1,4 +1,4 @@
-torch==1.13.1
-transformers==4.38.2
+torch
+transformers
 streamlit
 pillow
