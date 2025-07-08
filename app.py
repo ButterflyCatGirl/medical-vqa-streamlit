@@ -73,7 +73,7 @@ class MedicalVQAChatbot:
                 # Load VQA model
                 _self.vqa_processor = AutoProcessor.from_pretrained("ButterflyCatGirl/llava-medical-VQA-lora-merged3")
                 _self.vqa_model = AutoModelForImageTextToText.from_pretrained(
-                    "Mohamed264/llava-medical-VQA-lora-merged3",
+                    "ButterflyCatGirl/llava-medical-VQA-lora-merged3",
                     torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
                     device_map="auto" if torch.cuda.is_available() else None
                 )
