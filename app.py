@@ -10,10 +10,10 @@ st.set_page_config(page_title="Bilingual Medical VQA", layout="wide")
 def load_models():
     try:
         llava_model = AutoModelForImageTextToText.from_pretrained(
-            "Mohamed264/llava-medical-VQA-lora-merged3"
+            "ButterflyCatGirl/llava-medical-VQA-lora-merged3"
         )
         processor = AutoProcessor.from_pretrained(
-            "Mohamed264/llava-medical-VQA-lora-merged3"
+            "ButterflyCatGirl/llava-medical-VQA-lora-merged3"
         )
 
         ar_en_tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
