@@ -3,3 +3,4 @@ transformers
 streamlit
 pillow
 accelerate
+bitsandbytes
