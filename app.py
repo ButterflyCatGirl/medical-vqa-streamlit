@@ -3,14 +3,14 @@ import streamlit as st
 from PIL import Image
 import requests
 import torch
+import logging
 from transformers import (
     AutoProcessor,
-    AutoModelForImageTextToText,
+    AutoModelForVision2Seq,
     MarianTokenizer,
     MarianMTModel,
-    BitsAndBytesConfig  # New import for quantization
+    BitsAndBytesConfig
 )
-import logging
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -24,22 +24,23 @@ def load_models():
     
     with st.spinner("🔄 Loading Medical VQA Model..."):
         try:
-            # Configure 8-bit quantization
+            # Configure quantization
             quantization_config = BitsAndBytesConfig(
-                load_in_8bit=True,
-                llm_int8_skip_modules=["lm_head"]  # Skip problematic modules
+                load_in_4bit=True,  # Use 4-bit instead of 8-bit
+                bnb_4bit_compute_dtype=torch.float16
             )
             
             # Load processor and model
             models['vqa_processor'] = AutoProcessor.from_pretrained(
-                "ButterflyCatGirl/llava-medical-VQA-lora-merged3",
-                use_fast=True  # Fix slow processor warning
+                "Mohamed264/llava-medical-VQA-lora-merged3",
+                use_fast=True
             )
             
-            models['vqa_model'] = AutoModelForImageTextToText.from_pretrained(
-                "ButterflyCatGirl/llava-medical-VQA-lora-merged3",
+            models['vqa_model'] = AutoModelForVision2Seq.from_pretrained(
+                "Mohamed264/llava-medical-VQA-lora-merged3",
                 device_map="auto",
-                quantization_config=quantization_config
+                quantization_config=quantization_config,
+                torch_dtype=torch.float16
             )
         except Exception as e:
             logger.error(f"Error loading VQA model: {str(e)}")
@@ -112,7 +113,8 @@ def process_medical_vqa(image, question, models):
         inputs = processor(
             images=image, 
             text=prompt, 
-            return_tensors="pt"
+            return_tensors="pt",
+            padding=True
         ).to(vqa_model.device)
         
         # Generate response
