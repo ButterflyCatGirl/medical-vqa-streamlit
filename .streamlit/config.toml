@@ -4,3 +4,9 @@ backgroundColor = "#ffffff"
 secondaryBackgroundColor = "#f0f2f6"
 textColor = "#262730"
 font = "sans serif"
+
+[server]
+maxUploadSize = 200  # Increase if needed for larger images
+
+[runner]
+magicEnabled = false  # Disable magic commands for stability
