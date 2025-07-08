@@ -11,14 +11,14 @@ def load_models():
     try:
         from transformers import BitsAndBytesConfig
 
-bnb_config = BitsAndBytesConfig(load_in_8bit=False)
+        bnb_config = BitsAndBytesConfig(load_in_8bit=False)
 
-llava_model = AutoModelForImageTextToText.from_pretrained(
-    "Mohamed264/llava-medical-VQA-lora-merged3",
-    device_map=None,
-    torch_dtype=torch.float32,
-    quantization_config=bnb_config
-)
+        llava_model = AutoModelForImageTextToText.from_pretrained(
+            "Mohamed264/llava-medical-VQA-lora-merged3",
+            device_map=None,
+            torch_dtype=torch.float32,
+            quantization_config=bnb_config
+        )
         processor = AutoProcessor.from_pretrained(
             "Mohamed264/llava-medical-VQA-lora-merged3"
         )
