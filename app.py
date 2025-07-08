@@ -9,15 +9,10 @@ st.set_page_config(page_title="Bilingual Medical VQA", layout="wide")
 @st.cache_resource
 def load_models():
     try:
-        from transformers import BitsAndBytesConfig
-
-        bnb_config = BitsAndBytesConfig(load_in_8bit=False)
-
         llava_model = AutoModelForImageTextToText.from_pretrained(
             "Mohamed264/llava-medical-VQA-lora-merged3",
             device_map=None,
-            torch_dtype=torch.float32,
-            quantization_config=bnb_config
+            torch_dtype=torch.float32
         )
         processor = AutoProcessor.from_pretrained(
             "Mohamed264/llava-medical-VQA-lora-merged3"
