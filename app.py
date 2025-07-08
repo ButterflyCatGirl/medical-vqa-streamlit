@@ -26,7 +26,7 @@ def load_models():
         try:
             # Configure quantization
             quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,  # Use 4-bit instead of 8-bit
+                load_in_4bit=True,
                 bnb_4bit_compute_dtype=torch.float16
             )
             
