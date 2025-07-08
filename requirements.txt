@@ -1,6 +1,6 @@
-torch
-transformers
 streamlit
 pillow
+requests
+torch
+transformers
 accelerate
-bitsandbytes
