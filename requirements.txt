@@ -4,3 +4,4 @@ requests
 torch
 transformers
 accelerate
+bitsandbytes
