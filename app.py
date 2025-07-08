@@ -7,9 +7,14 @@ from transformers import (
     AutoProcessor,
     AutoModelForImageTextToText,
     MarianTokenizer,
-    MarianMTModel
+    MarianMTModel,
+    BitsAndBytesConfig  # New import for quantization
 )
-import bitsandbytes  # Required for 8-bit quantization
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Cache resource-intensive model loading
 @st.cache_resource
@@ -18,22 +23,42 @@ def load_models():
     models = {}
     
     with st.spinner("🔄 Loading Medical VQA Model..."):
-        # Add device_map and load_in_8bit parameters
-        models['vqa_processor'] = AutoProcessor.from_pretrained("Mohamed264/llava-medical-VQA-lora-merged3")
-        models['vqa_model'] = AutoModelForImageTextToText.from_pretrained(
-            "Mohamed264/llava-medical-VQA-lora-merged3",
-            device_map="auto",  # Automatically selects GPU if available
-            load_in_8bit=True   # Enable 8-bit quantization
-        )
+        try:
+            # Configure 8-bit quantization
+            quantization_config = BitsAndBytesConfig(
+                load_in_8bit=True,
+                llm_int8_skip_modules=["lm_head"]  # Skip problematic modules
+            )
+            
+            # Load processor and model
+            models['vqa_processor'] = AutoProcessor.from_pretrained(
+                "ButterflyCatGirl/llava-medical-VQA-lora-merged3",
+                use_fast=True  # Fix slow processor warning
+            )
+            
+            models['vqa_model'] = AutoModelForImageTextToText.from_pretrained(
+                "ButterflyCatGirl/llava-medical-VQA-lora-merged3",
+                device_map="auto",
+                quantization_config=quantization_config
+            )
+        except Exception as e:
+            logger.error(f"Error loading VQA model: {str(e)}")
+            st.error(f"❌ Failed to load medical model: {str(e)}")
+            return None
     
     with st.spinner("🔄 Loading Translation Models..."):
-        # English to Arabic
-        models['en_ar_tokenizer'] = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
-        models['en_ar_model'] = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
-        
-        # Arabic to English
-        models['ar_en_tokenizer'] = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
-        models['ar_en_model'] = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+        try:
+            # English to Arabic
+            models['en_ar_tokenizer'] = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
+            models['en_ar_model'] = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
+            
+            # Arabic to English
+            models['ar_en_tokenizer'] = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+            models['ar_en_model'] = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+        except Exception as e:
+            logger.error(f"Error loading translation models: {str(e)}")
+            st.error(f"❌ Failed to load translation models: {str(e)}")
+            return None
     
     return models
 
@@ -63,6 +88,9 @@ def translate_text(text, source_lang, target_lang, models):
 
 def process_medical_vqa(image, question, models):
     """Process medical VQA with translation support"""
+    if not models:
+        return "Error: Models not loaded", "en"
+    
     # Detect input language
     input_lang = detect_language(question)
     
@@ -75,40 +103,45 @@ def process_medical_vqa(image, question, models):
     # Prepare prompt for VQA model
     prompt = f"Question: {english_question}\nAnswer:"
     
-    # Process inputs
-    processor = models['vqa_processor']
-    vqa_model = models['vqa_model']
+    try:
+        # Process inputs
+        processor = models['vqa_processor']
+        vqa_model = models['vqa_model']
+        
+        # Process image and text together
+        inputs = processor(
+            images=image, 
+            text=prompt, 
+            return_tensors="pt"
+        ).to(vqa_model.device)
+        
+        # Generate response
+        with torch.no_grad():
+            outputs = vqa_model.generate(
+                **inputs,
+                max_length=512,
+                temperature=0.7,
+                do_sample=True
+            )
+        
+        # Decode response
+        english_response = processor.decode(outputs[0], skip_special_tokens=True)
+        
+        # Extract answer
+        if "Answer:" in english_response:
+            english_response = english_response.split("Answer:")[-1].strip()
+        
+        # Translate response back to user's language
+        if input_lang == 'ar':
+            final_response = translate_text(english_response, 'en', 'ar', models)
+        else:
+            final_response = english_response
+        
+        return final_response, input_lang
     
-    # Process image and text together
-    inputs = processor(
-        images=image, 
-        text=prompt, 
-        return_tensors="pt"
-    ).to(vqa_model.device)
-    
-    # Generate response
-    with torch.no_grad():
-        outputs = vqa_model.generate(
-            **inputs,
-            max_length=512,
-            temperature=0.7,
-            do_sample=True
-        )
-    
-    # Decode response
-    english_response = processor.decode(outputs[0], skip_special_tokens=True)
-    
-    # Extract answer
-    if "Answer:" in english_response:
-        english_response = english_response.split("Answer:")[-1].strip()
-    
-    # Translate response back to user's language
-    if input_lang == 'ar':
-        final_response = translate_text(english_response, 'en', 'ar', models)
-    else:
-        final_response = english_response
-    
-    return final_response, input_lang
+    except Exception as e:
+        logger.error(f"VQA processing error: {str(e)}")
+        return f"Error processing request: {str(e)}", "en"
 
 def main():
     # Configure Streamlit page
@@ -128,11 +161,14 @@ def main():
         - "ما هو التشخيص المحتمل لهذه الصورة؟"
     """)
     
+    # Display warning about initial load time
+    st.info("⚠️ First-time loading may take 2-5 minutes as we download AI models. Please be patient.")
+    
     # Load models (cached)
-    try:
-        models = load_models()
-    except Exception as e:
-        st.error(f"❌ Failed to load models: {str(e)}")
+    models = load_models()
+    
+    if not models:
+        st.error("Critical error: Failed to load AI models. Please check the logs.")
         st.stop()
     
     # Create two columns for layout
