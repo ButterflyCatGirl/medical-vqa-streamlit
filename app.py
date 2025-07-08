@@ -22,7 +22,7 @@ def load_models():
     
     with st.spinner("🔄 Loading Medical VQA Model..."):
         try:
-            # Load processor and model without quantization
+            # Load processor and model
             models['vqa_processor'] = AutoProcessor.from_pretrained(
                 "Mohamed264/llava-medical-VQA-lora-merged3"
             )
