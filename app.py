@@ -9,6 +9,7 @@ from transformers import (
     MarianTokenizer,
     MarianMTModel
 )
+import bitsandbytes  # Required for 8-bit quantization
 
 # Cache resource-intensive model loading
 @st.cache_resource
@@ -17,8 +18,13 @@ def load_models():
     models = {}
     
     with st.spinner("🔄 Loading Medical VQA Model..."):
+        # Add device_map and load_in_8bit parameters
         models['vqa_processor'] = AutoProcessor.from_pretrained("Mohamed264/llava-medical-VQA-lora-merged3")
-        models['vqa_model'] = AutoModelForImageTextToText.from_pretrained("Mohamed264/llava-medical-VQA-lora-merged3")
+        models['vqa_model'] = AutoModelForImageTextToText.from_pretrained(
+            "Mohamed264/llava-medical-VQA-lora-merged3",
+            device_map="auto",  # Automatically selects GPU if available
+            load_in_8bit=True   # Enable 8-bit quantization
+        )
     
     with st.spinner("🔄 Loading Translation Models..."):
         # English to Arabic
@@ -72,7 +78,13 @@ def process_medical_vqa(image, question, models):
     # Process inputs
     processor = models['vqa_processor']
     vqa_model = models['vqa_model']
-    inputs = processor(images=image, text=prompt, return_tensors="pt").to(vqa_model.device)
+    
+    # Process image and text together
+    inputs = processor(
+        images=image, 
+        text=prompt, 
+        return_tensors="pt"
+    ).to(vqa_model.device)
     
     # Generate response
     with torch.no_grad():
@@ -98,17 +110,6 @@ def process_medical_vqa(image, question, models):
     
     return final_response, input_lang
 
-def load_image(image_input):
-    """Load image from different sources"""
-    if isinstance(image_input, str):
-        if image_input.startswith('http'):
-            return Image.open(requests.get(image_input, stream=True).raw)
-        else:
-            return Image.open(image_input)
-    elif isinstance(image_input, Image.Image):
-        return image_input
-    return image_input
-
 def main():
     # Configure Streamlit page
     st.set_page_config(
@@ -128,7 +129,11 @@ def main():
     """)
     
     # Load models (cached)
-    models = load_models()
+    try:
+        models = load_models()
+    except Exception as e:
+        st.error(f"❌ Failed to load models: {str(e)}")
+        st.stop()
     
     # Create two columns for layout
     col1, col2 = st.columns([1, 2])
@@ -138,13 +143,12 @@ def main():
         st.subheader("1. Medical Image")
         img_source = st.radio("Image source:", ["Upload", "URL"])
         
+        image = None
         if img_source == "Upload":
             image_file = st.file_uploader("Upload medical image", type=["jpg", "jpeg", "png"])
             if image_file:
                 image = Image.open(image_file)
                 st.image(image, caption="Uploaded Image", use_column_width=True)
-            else:
-                image = None
         else:
             image_url = st.text_input("Image URL:", placeholder="https://example.com/image.jpg")
             if image_url:
@@ -153,9 +157,6 @@ def main():
                     st.image(image, caption="Image from URL", use_column_width=True)
                 except:
                     st.error("❌ Failed to load image from URL")
-                    image = None
-            else:
-                image = None
     
     with col2:
         # Chat interface
