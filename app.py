@@ -1,119 +1,101 @@
 import streamlit as st
-from transformers import AutoProcessor, AutoModelForImageTextToText, MarianMTModel, MarianTokenizer
-from PIL import Image
 import torch
+from transformers import AutoProcessor, AutoModelForImageTextToText, MarianTokenizer, MarianMTModel
+from PIL import Image
+import time
 
-st.set_page_config(page_title="Bilingual Medical VQA", layout="wide")
+st.set_page_config(
+    page_title="Medical VQA Chatbot",
+    page_icon="🏥",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-# Load models
 @st.cache_resource
 def load_models():
     try:
-        llava_model = AutoModelForImageTextToText.from_pretrained(
+        processor = AutoProcessor.from_pretrained("Mohamed264/llava-medical-VQA-lora-merged3")
+        vqa_model = AutoModelForImageTextToText.from_pretrained(
             "Mohamed264/llava-medical-VQA-lora-merged3",
-            device_map=None,
-            torch_dtype=torch.float32
+            torch_dtype=torch.float32,
+            device_map=None
         )
-        processor = AutoProcessor.from_pretrained(
-            "Mohamed264/llava-medical-VQA-lora-merged3"
-        )
-
-        ar_en_tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
-        ar_en_model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
 
         en_ar_tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
         en_ar_model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
 
-        return (
-            llava_model,
-            processor,
-            ar_en_tokenizer,
-            ar_en_model,
-            en_ar_tokenizer,
-            en_ar_model,
-        )
+        ar_en_tokenizer = MarianTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+        ar_en_model = MarianMTModel.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+
+        return processor, vqa_model, en_ar_tokenizer, en_ar_model, ar_en_tokenizer, ar_en_model
+
     except Exception as e:
         st.error(f"❌ Error loading models: {str(e)}")
         return None, None, None, None, None, None
 
-# Instantiate models
-llava_model, processor, ar_en_tokenizer, ar_en_model, en_ar_tokenizer, en_ar_model = load_models()
+processor, vqa_model, en_ar_tokenizer, en_ar_model, ar_en_tokenizer, ar_en_model = load_models()
 
-if not all([llava_model, processor, ar_en_tokenizer, ar_en_model, en_ar_tokenizer, en_ar_model]):
+if not all([processor, vqa_model, en_ar_tokenizer, en_ar_model, ar_en_tokenizer, ar_en_model]):
     st.stop()
 
-# Translation helpers
-def translate_ar_to_en(text):
-    inputs = ar_en_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
-    outputs = ar_en_model.generate(**inputs)
-    return ar_en_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+# Language detection
 
-def translate_en_to_ar(text):
-    inputs = en_ar_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
-    outputs = en_ar_model.generate(**inputs)
-    return en_ar_tokenizer.decode(outputs[0], skip_special_tokens=True).strip()
+def detect_language(text):
+    ar_chars = sum(1 for c in text if '؀' <= c <= 'ۿ')
+    en_chars = sum(1 for c in text.lower() if 'a' <= c <= 'z')
+    return 'ar' if ar_chars > en_chars else 'en'
 
-# Medical terms dictionary
-medical_terms = {
-    "chest x-ray": "أشعة سينية للصدر",
-    "x-ray": "أشعة سينية",
-    "ct scan": "تصوير مقطعي محوسب",
-    "mri": "تصوير بالرنين المغناطيسي",
-    "ultrasound": "تصوير بالموجات فوق الصوتية",
-    "normal": "طبيعي",
-    "abnormal": "غير طبيعي",
-    "brain": "الدماغ",
-    "fracture": "كسر",
-    "no abnormality detected": "لا توجد شذوذات",
-    "left lung": "الرئة اليسرى",
-    "right lung": "الرئة اليمنى"
-}
+# Translation
 
-def translate_answer_medical(answer_en):
-    key = answer_en.lower().strip()
-    return medical_terms.get(key, translate_en_to_ar(answer_en))
+def translate_text(text, source, target):
+    try:
+        if source == 'ar' and target == 'en':
+            inputs = ar_en_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+            translated = ar_en_model.generate(**inputs, max_length=512)
+            return ar_en_tokenizer.decode(translated[0], skip_special_tokens=True).strip()
+        elif source == 'en' and target == 'ar':
+            inputs = en_ar_tokenizer(text, return_tensors="pt", padding=True, truncation=True)
+            translated = en_ar_model.generate(**inputs, max_length=512)
+            return en_ar_tokenizer.decode(translated[0], skip_special_tokens=True).strip()
+        return text
+    except:
+        return text
 
-# Main VQA function
-def vqa_multilingual(image, question):
-    if not image or not question.strip():
-        return "", "", "", "يرجى رفع صورة وكتابة سؤال."
+# Main VQA logic
 
-    is_arabic = any('\u0600' <= c <= '\u06FF' for c in question)
-    question_ar = question.strip() if is_arabic else translate_en_to_ar(question)
-    question_en = translate_ar_to_en(question) if is_arabic else question.strip()
+def process_vqa(image, question):
+    lang = detect_language(question)
+    question_en = translate_text(question, 'ar', 'en') if lang == 'ar' else question
+    prompt = f"USER: <image>\n{question_en}\nASSISTANT:"
 
-    inputs = processor(image, question_en, return_tensors="pt")
+    inputs = processor(text=prompt, images=image, return_tensors="pt")
     with torch.no_grad():
-        output = llava_model.generate(**inputs)
-    answer_en = processor.decode(output[0], skip_special_tokens=True).strip()
-    answer_ar = translate_answer_medical(answer_en)
-
-    return question_ar, question_en, answer_ar, answer_en
+        outputs = vqa_model.generate(
+            **inputs,
+            max_new_tokens=256,
+            temperature=0.7,
+            do_sample=True,
+            top_p=0.9,
+            pad_token_id=processor.tokenizer.eos_token_id
+        )
+    answer_en = processor.decode(outputs[0], skip_special_tokens=True).split("ASSISTANT:")[-1].strip()
+    answer = translate_text(answer_en, 'en', 'ar') if lang == 'ar' else answer_en
+    return answer
 
 # Streamlit UI
-st.title("🧠 نموذج الأسئلة البصرية الطبية (VQA) ثنائي اللغة")
-st.markdown("ارفع صورة طبية واسأل بالعربية أو الإنجليزية، وستحصل على الإجابة باللغتين.")
 
-uploaded_image = st.file_uploader("🔍 ارفع صورة الأشعة", type=["jpg", "jpeg", "png"])
-user_question = st.text_input("💬 أدخل سؤالك (بالعربية أو الإنجليزية):")
+st.title("🏥 Medical VQA Chatbot")
+st.markdown("Upload medical images and ask questions in English or Arabic | ارفع الصور الطبية واسأل بالإنجليزية أو العربية")
 
-if st.button("🔎 تحليل الصورة والإجابة"):
-    if uploaded_image and user_question:
-        image = Image.open(uploaded_image).convert("RGB")
-        question_ar, question_en, answer_ar, answer_en = vqa_multilingual(
-            image, user_question
-        )
+uploaded_file = st.file_uploader("Choose a medical image | اختر صورة طبية", type=['png', 'jpg', 'jpeg', 'bmp', 'tiff'])
+user_question = st.text_area("Enter your question in English or Arabic:", height=100)
 
-        st.subheader("📌 السؤال بالعربية")
-        st.success(question_ar)
-
-        st.subheader("📌 السؤال بالإنجليزية")
-        st.success(question_en)
-
-        st.subheader("✅ الإجابة بالعربية")
-        st.info(answer_ar)
-
-        st.subheader("✅ الإجابة بالإنجليزية")
-        st.info(answer_en)
+if st.button("🚀 Send | إرسال"):
+    if not uploaded_file or not user_question.strip():
+        st.warning("⚠️ Please upload an image and enter a question! | يرجى رفع صورة وكتابة سؤال!")
     else:
-        st.error("يرجى رفع صورة وكتابة سؤال.")
+        image = Image.open(uploaded_file).convert("RGB")
+        with st.spinner("Processing your question..."):
+            response = process_vqa(image, user_question)
+        st.success("✅ Response:")
+        st.markdown(response)
