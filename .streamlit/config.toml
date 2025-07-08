@@ -6,7 +6,8 @@ textColor = "#262730"
 font = "sans serif"
 
 [server]
-maxUploadSize = 200  # Increase if needed for larger images
+port = 8501
+enableCORS = false
 
 [runner]
 magicEnabled = false  # Disable magic commands for stability
