@@ -71,7 +71,7 @@ class MedicalVQAChatbot:
         try:
             with st.spinner("Loading Medical VQA Model... This may take a few minutes on first run."):
                 # Load VQA model
-                _self.vqa_processor = AutoProcessor.from_pretrained("Mohamed264/llava-medical-VQA-lora-merged3")
+                _self.vqa_processor = AutoProcessor.from_pretrained("ButterflyCatGirl/llava-medical-VQA-lora-merged3")
                 _self.vqa_model = AutoModelForImageTextToText.from_pretrained(
                     "Mohamed264/llava-medical-VQA-lora-merged3",
                     torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
