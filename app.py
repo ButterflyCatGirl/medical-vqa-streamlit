@@ -1,4 +1,3 @@
-# medical_vqa_chatbot.py
 import streamlit as st
 from PIL import Image
 import requests
@@ -8,8 +7,7 @@ from transformers import (
     AutoProcessor,
     AutoModelForVision2Seq,
     MarianTokenizer,
-    MarianMTModel,
-    BitsAndBytesConfig
+    MarianMTModel
 )
 
 # Configure logging
@@ -24,22 +22,14 @@ def load_models():
     
     with st.spinner("🔄 Loading Medical VQA Model..."):
         try:
-            # Configure quantization
-            quantization_config = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_compute_dtype=torch.float16
-            )
-            
-            # Load processor and model
+            # Load processor and model without quantization
             models['vqa_processor'] = AutoProcessor.from_pretrained(
-                "Mohamed264/llava-medical-VQA-lora-merged3",
-                use_fast=True
+                "Mohamed264/llava-medical-VQA-lora-merged3"
             )
             
             models['vqa_model'] = AutoModelForVision2Seq.from_pretrained(
                 "Mohamed264/llava-medical-VQA-lora-merged3",
                 device_map="auto",
-                quantization_config=quantization_config,
                 torch_dtype=torch.float16
             )
         except Exception as e:
@@ -167,7 +157,11 @@ def main():
     st.info("⚠️ First-time loading may take 2-5 minutes as we download AI models. Please be patient.")
     
     # Load models (cached)
-    models = load_models()
+    try:
+        models = load_models()
+    except Exception as e:
+        st.error(f"❌ Failed to load models: {str(e)}")
+        st.stop()
     
     if not models:
         st.error("Critical error: Failed to load AI models. Please check the logs.")
