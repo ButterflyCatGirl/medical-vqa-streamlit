@@ -67,11 +67,14 @@ class MedicalVQAChatbot:
         """Load all required models with caching"""
         try:
             with st.spinner("Loading Medical VQA Model... This may take a few minutes on first run."):
-                _self.vqa_processor = LlavaProcessor.from_pretrained("ButterflyCatGirl/llava-medical-VQA-lora-merged3")
+                _self.vqa_processor = LlavaProcessor.from_pretrained("Mohamed264/llava-medical-VQA-lora-merged3")
+                # Load model without quantization for CPU or with bitsandbytes for GPU
+                load_in_8bit = torch.cuda.is_available()  # Only use 8-bit if GPU is available
                 _self.vqa_model = LlavaForConditionalGeneration.from_pretrained(
-                    "ButterflyCatGirl/llava-medical-VQA-lora-merged3",
+                    "Mohamed264/llava-medical-VQA-lora-merged3",
                     torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                    device_map="auto" if torch.cuda.is_available() else None
+                    device_map="auto" if torch.cuda.is_available() else None,
+                    load_in_8bit=load_in_8bit if torch.cuda.is_available() else False
                 )
                 if not torch.cuda.is_available():
                     _self.vqa_model.to(_self.device)
