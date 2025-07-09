@@ -1,7 +1,1 @@
-cmake
-pkg-config
-build-essential
-libopenblas-dev
-liblapack-dev
-libjpeg-dev
-zlib1g-dev
+
