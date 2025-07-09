@@ -4,39 +4,49 @@ from PIL import Image
 import torch
 import langdetect
 
-# --- Model Loading with Caching ---
-@st.cache_resource
+# --- Model Loading with Caching and Error Handling ---
+@st.cache_resource(ttl=3600)  # Cache for 1 hour
 def load_translation_models():
-    """Load Arabic-English and English-Arabic translation models."""
-    ar_en_tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
-    ar_en_model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
-    en_ar_tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
-    en_ar_model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
-    return {
-        'ar_en': {'model': ar_en_model, 'tokenizer': ar_en_tokenizer},
-        'en_ar': {'model': en_ar_model, 'tokenizer': en_ar_tokenizer}
-    }
+    try:
+        ar_en_tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+        ar_en_model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-ar-en")
+        en_ar_tokenizer = AutoTokenizer.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
+        en_ar_model = AutoModelForSeq2SeqLM.from_pretrained("Helsinki-NLP/opus-mt-en-ar")
+        return {
+            'ar_en': {'model': ar_en_model, 'tokenizer': ar_en_tokenizer},
+            'en_ar': {'model': en_ar_model, 'tokenizer': en_ar_tokenizer}
+        }
+    except Exception as e:
+        st.error(f"Error loading translation models: {str(e)}")
+        return None
 
-@st.cache_resource
+@st.cache_resource(ttl=3600)  # Cache for 1 hour
 def load_vqa_model():
-    """Load the LLaVA VQA model and processor."""
-    model_id = "ButterflyCatGirl/llava-medical-VQA-lora-merged3"
-    processor = LlavaProcessor.from_pretrained(model_id)
-    model = LlavaForConditionalGeneration.from_pretrained(
-        model_id, 
-        torch_dtype=torch.float16, 
-        low_cpu_mem_usage=True
-    )
-    # Move model to GPU if available
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    model.to(device)
-    return model, processor
+    try:
+        model_id = "llava-hf/llava-1.5-7b-hf"
+        processor = LlavaProcessor.from_pretrained(model_id)
+        model = LlavaForConditionalGeneration.from_pretrained(
+            model_id, 
+            torch_dtype=torch.float16, 
+            low_cpu_mem_usage=True
+        )
+        # Move model to GPU if available
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model.to(device)
+        return model, processor
+    except Exception as e:
+        st.error(f"Error loading VQA model: {str(e)}")
+        return None, None
 
 # Load models (cached to avoid reloading on each run)
 with st.spinner("Loading models (this may take a few minutes on first run)..."):
     translation_models = load_translation_models()
     vqa_model, vqa_processor = load_vqa_model()
-st.success("Models loaded successfully!")
+
+if translation_models and vqa_model and vqa_processor:
+    st.success("Models loaded successfully!")
+else:
+    st.error("Failed to load models. Check the error messages above.")
 
 # --- Helper Functions ---
 def detect_language(text):
