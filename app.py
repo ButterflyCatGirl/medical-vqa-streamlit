@@ -20,7 +20,7 @@ def load_translation_models():
 @st.cache_resource
 def load_vqa_model():
     """Load the LLaVA VQA model and processor."""
-    model_id = "llava-hf/llava-1.5-7b-hf"
+    model_id = "ButterflyCatGirl/llava-medical-VQA-lora-merged3"
     processor = LlavaProcessor.from_pretrained(model_id)
     model = LlavaForConditionalGeneration.from_pretrained(
         model_id, 
