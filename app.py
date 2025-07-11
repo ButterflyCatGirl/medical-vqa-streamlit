@@ -5,7 +5,7 @@ from PIL import Image
 
 # Set page title and layout
 st.set_page_config(page_title="BLIP VQA Model", layout="wide")
-st.title("🤖 BLIP VQA Model - `sharawy53/diploma`")
+#st.title("🤖 BLIP VQA Model - `sharawy53/diploma`")
 
 @st.cache_resource(show_spinner=False)
 def load_model():
@@ -21,6 +21,10 @@ def load_model():
 def predict(image, question):
     """Run model prediction"""
     try:
+        # Convert image to RGB if needed
+        if image.mode != "RGB":
+            image = image.convert("RGB")
+            
         inputs = processor(image, question, return_tensors="pt").to(device)
         with torch.no_grad():
             outputs = model.generate(**inputs)
@@ -47,7 +51,7 @@ with col1:
     # Preview uploaded image
     if uploaded_file:
         image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_column_width=True)
+        st.image(image, caption="Uploaded Image", use_container_width=True)  # Updated parameter here
 
 with col2:
     # Question input section
@@ -60,7 +64,7 @@ with col2:
     
     # Display prediction
     if uploaded_file and question:
-        with st.spinner("Thinking..."):
+        with st.spinner("Analyzing image and question..."):
             answer = predict(image, question)
         st.subheader("Answer")
         st.info(answer)
