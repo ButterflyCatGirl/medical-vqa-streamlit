@@ -1,4 +1,5 @@
 streamlit
-torch
 transformers
+torch
 pillow
+sentencepiece
