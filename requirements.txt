@@ -2,5 +2,5 @@ streamlit==1.32.0
 torch==2.2.1
 transformers==4.39.0
 pillow==10.2.0
-sentencepiece==0.2.0  # Critical addition
-protobuf==4.25.3      # Often required with sentencepiece
+sentencepiece
+protobuf
